@@ -43,6 +43,10 @@ inputs:
       The label is used to remove the runner from GitHub when the runner is not needed anymore.
       This input is required if you use the 'stop' mode.
     required: false
+  associate-public-ip:
+    description: >-
+      Determines whether a public IP address will be associated with the Github runner's EC2 instance's network interface
+    required: false
   ec2-instance-id:
     description: >-
       EC2 Instance Id of the created runner.
