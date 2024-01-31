@@ -36,12 +36,14 @@ async function startEc2Instance(label, githubRegistrationToken) {
   const ec2 = new AWS.EC2();
 
   const userData = buildUserDataScript(githubRegistrationToken, label);
+  const associatePublicIp = (config.input.associatePublicIp === 'true');
 
   const params = {
     ImageId: config.input.ec2ImageId,
     InstanceType: config.input.ec2InstanceType,
     MinCount: 1,
     MaxCount: 1,
+    NetworkInterfaces: { AssociatePublicIpAddress: associatePublicIp },
     UserData: Buffer.from(userData.join('\n')).toString('base64'),
     SubnetId: config.input.subnetId,
     SecurityGroupIds: [config.input.securityGroupId],
