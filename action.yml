@@ -129,7 +129,38 @@ inputs:
     description: >-
       EC2 block device type.
     required: false
-
+  metadata-options:
+    description: >-
+      JSON string specifying the metadata options for the EC2 instance.
+      Example: '{"HttpTokens": "required", "HttpEndpoint": "enabled", "HttpPutResponseHopLimit": 2, "InstanceMetadataTags": "enabled"}'
+  packages:
+    description: >-
+      JSON array of packages to install via cloud-init.
+      Example: '["git", "docker.io", "nodejs"]'
+    required: false
+    default: '[]'
+  use-jit:
+    description: >-
+      Enable JIT (Just-In-Time) runner configuration. Uses GitHub's
+      generate-jitconfig API instead of the traditional registration-token approach.
+      JIT runners are single-use and auto-deregister after completing one job.
+      Incompatible with 'run-runner-as-service: true'.
+    required: false
+    default: 'false'
+  runner-group-id:
+    description: >-
+      The ID of the runner group to register the JIT runner in.
+      Defaults to 1, which is the "Default" runner group for repository-level runners.
+      Only used when 'use-jit' is true.
+    required: false
+    default: '1'
+  runner-debug:
+    description: >-
+      Enable verbose debug logging for the runner setup.
+      When true, outputs detailed instance info, console output polling,
+      and step-by-step script execution logs.
+    required: false
+    default: 'false'
 outputs:
   label:
     description: >-
@@ -146,5 +177,5 @@ outputs:
       AWS region where the EC2 instance was created.
       This is useful for subsequent AWS operations on the instance.
 runs:
-  using: node20
+  using: node24
   main: ./dist/index.js
