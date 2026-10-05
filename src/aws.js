@@ -229,13 +229,11 @@ async function createEc2InstanceWithParams(imageId, subnetId, securityGroupId, l
     NetworkInterfaces: [
       {
         DeviceIndex: 0,
-        SubnetId: config.input.subnetId,
-        Groups: [config.input.securityGroupId],
+        SubnetId: subnetId,
+        Groups: [securityGroupId],
         AssociatePublicIpAddress: associatePublicIp,
       }
     ],
-    SecurityGroupIds: [securityGroupId],
-    SubnetId: subnetId,
     UserData: Buffer.from(userData).toString('base64'),
     IamInstanceProfile: config.input.iamRoleName ? { Name: config.input.iamRoleName } : undefined,
     TagSpecifications: config.tagSpecifications,
