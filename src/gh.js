@@ -31,6 +31,33 @@ async function getRegistrationToken() {
   }
 }
 
+// generate a JIT (Just-In-Time) runner configuration via the GitHub API
+async function getJitRunnerConfig(label) {
+  const octokit = github.getOctokit(config.input.githubToken);
+
+  try {
+    const response = await octokit.request(
+      'POST /repos/{owner}/{repo}/actions/runners/generate-jitconfig',
+      {
+        ...config.githubContext,
+        name: `ec2-${label}`,
+        runner_group_id: config.input.runnerGroupId,
+        labels: [label],
+        work_folder: '_work',
+      }
+    );
+
+    core.info('GitHub JIT runner configuration is received');
+    return {
+      runnerId: response.data.runner.id,
+      encodedJitConfig: response.data.encoded_jit_config,
+    };
+  } catch (error) {
+    core.error('GitHub JIT runner configuration generation error');
+    throw error;
+  }
+}
+
 async function removeRunner() {
   const runner = await getRunner(config.input.label);
   const octokit = github.getOctokit(config.input.githubToken);
@@ -51,34 +78,44 @@ async function removeRunner() {
   }
 }
 
-async function waitForRunnerRegistered(label) {
+async function waitForRunnerRegistered(label, onPollCallback) {
   const timeoutMinutes = parseInt(config.input.startupTimeoutMinutes) || 5;
   const retryIntervalSeconds = parseInt(config.input.startupRetryIntervalSeconds) || 10;
   const quietPeriodSeconds = parseInt(config.input.startupQuietPeriodSeconds) || 30;
-
-  let waitSeconds = 0;
 
   core.info(`Waiting ${quietPeriodSeconds}s for the AWS EC2 instance to be registered in GitHub as a new self-hosted runner`);
   await new Promise((r) => setTimeout(r, quietPeriodSeconds * 1000));
   core.info(`Checking every ${retryIntervalSeconds}s if the GitHub self-hosted runner is registered`);
   core.info(`The maximum waiting time is ${timeoutMinutes} minutes`);
+
+  const startTime = Date.now();
+  const timeoutMs = timeoutMinutes * 60 * 1000;
+
   return new Promise((resolve, reject) => {
     const interval = setInterval(async () => {
+      const elapsedMs = Date.now() - startTime;
+      const elapsedSec = Math.round(elapsedMs / 1000);
       const runner = await getRunner(label);
 
       if (runner && runner.status === 'online') {
         core.info(`GitHub self-hosted runner ${runner.name} is registered and ready to use`);
         clearInterval(interval);
         resolve();
-      } else if (waitSeconds > timeoutMinutes * 60) {
+      } else if (elapsedMs >= timeoutMs) {
         core.error('GitHub self-hosted runner registration error');
+        // Fetch console output one last time before failing
+        if (onPollCallback) {
+          try { await onPollCallback(); } catch (e) { core.warning(`Poll callback error: ${e.message}`); }
+        }
         clearInterval(interval);
         reject(
           `A timeout of ${timeoutMinutes} minutes is exceeded. Your AWS EC2 instance was not able to register itself in GitHub as a new self-hosted runner.`,
         );
       } else {
-        waitSeconds += retryIntervalSeconds;
-        core.info('Checking...');
+        core.info(`Checking... (${elapsedSec}s elapsed)`);
+        if (onPollCallback) {
+          try { await onPollCallback(); } catch (e) { core.warning(`Poll callback error: ${e.message}`); }
+        }
       }
     }, retryIntervalSeconds * 1000);
   });
@@ -86,6 +123,7 @@ async function waitForRunnerRegistered(label) {
 
 module.exports = {
   getRegistrationToken,
+  getJitRunnerConfig,
   removeRunner,
   waitForRunnerRegistered,
 };

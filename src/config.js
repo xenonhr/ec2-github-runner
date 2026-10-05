@@ -27,11 +27,16 @@ class Config {
       ec2VolumeType: core.getInput('ec2-volume-type'),
       blockDeviceMappings: JSON.parse(core.getInput('block-device-mappings') || '[]'),
       availabilityZonesConfig: core.getInput('availability-zones-config'),
+      metadataOptions: JSON.parse(core.getInput('metadata-options') || '{}'),
+      packages: JSON.parse(core.getInput('packages') || '[]'),
+      useJit: core.getInput('use-jit') === 'true',
+      runnerGroupId: parseInt(core.getInput('runner-group-id') || '1', 10),
+      runnerDebug: core.getInput('runner-debug') === 'true',
     };
 
     // Get the AWS_REGION environment variable
     this.defaultRegion = process.env.AWS_REGION;
-    
+
     const tags = JSON.parse(core.getInput('aws-resource-tags'));
     this.tagSpecifications = null;
     if (tags.length > 0) {
@@ -69,7 +74,7 @@ class Config {
       if (this.input.availabilityZonesConfig) {
         try {
           this.availabilityZones = JSON.parse(this.input.availabilityZonesConfig);
-          
+
           // Validate each availability zone configuration
           if (!Array.isArray(this.availabilityZones)) {
             throw new Error('availability-zones-config must be a JSON array');
@@ -107,7 +112,7 @@ class Config {
             `Either provide 'availability-zones-config' or all of the following: 'ec2-image-id', 'subnet-id', 'security-group-id'`
           );
         }
-        
+
         // Convert individual parameters to a single availability zone config
         this.availabilityZones.push({
           imageId: this.input.ec2ImageId,
@@ -116,8 +121,15 @@ class Config {
           // Add default region when using legacy configuration
           region: this.defaultRegion
         });
-        
+
         core.info('Using individual parameters as a single availability zone configuration');
+      }
+
+      if (this.input.useJit && this.input.runAsService) {
+        throw new Error(
+          "The 'use-jit' and 'run-runner-as-service' inputs are incompatible. " +
+          'JIT runners are single-use and cannot run as a service.'
+        );
       }
 
       if (this.marketType?.length > 0 && this.input.marketType !== 'spot') {
@@ -146,3 +158,5 @@ try {
   core.error(error);
   core.setFailed(error.message);
 }
+
+module.exports.Config = Config;
